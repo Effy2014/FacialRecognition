@@ -1,0 +1,193 @@
+---
+title: "FacialRecognition"
+author: "Xinli"
+date: "April 9, 2016"
+output: html_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE)
+```
+
+```{r}
+# make sure R is in the proper working directory
+setwd("~/Desktop/datamining-hw")
+# include the relevant libraries
+library(rmarkdown)
+library(pixmap)
+library(class)
+```
+
+Load the views P00A+000E+00, P00A+005E+10, P00A+005E-10, and P00A+010E+00 for all subjects in the CroppedYale directory. Convert each photo to a vector; store the collection as a matrix where each row is a photo. Give this matrix the name face_matrix. For each image, record the subject number and view in a data frame. The subject numbers will be used as our data labels
+
+```{r}
+pic_list = 1:38
+views = c('P00A+000E+00', 'P00A+005E+10', 'P00A+005E-10', 'P00A+010E+00' )
+# load the data and save it as a matrix with the name face_matrix
+
+# get directory structure
+dir_list_1 = dir(path="CroppedYale/",all.files=FALSE)
+dir_list_2 = dir(path="CroppedYale/",all.files=FALSE,recursive=TRUE)
+
+# Find the total number of pixels in a picture
+
+# Pre-allocate a matrix with dimensions (number of pictures) x (number of pixels per picture)
+face_matrix = vector()
+subject <- vector()
+view <- vector()
+# Load all of the pictures
+for (i in pic_list){
+    for (j in 1:4) {
+        filename = sprintf("CroppedYale/%s/%s_%s.pgm",
+                           dir_list_1[pic_list[i]] , dir_list_1[pic_list[i]] , views[j])
+        face = read.pnm(filename)
+        face_vector = getChannels(face)
+        face_vectors = as.vector(face_vector)
+        face_matrix = rbind(face_matrix, face_vectors)
+        subject <- c(subject, i)
+        view <- c(view, j)
+    }
+}
+
+# Get the size of the matrix for use later
+fm_size = dim(face_matrix)
+# Use 4/5 of the data for training, 1/5 for testing
+ntrain = floor(fm_size[1]*4/5) # Number of training obs
+ntest = fm_size[1]-ntrain # Number of testing obs
+set.seed(1) # Set pseudo-random numbers getting the same output
+ind_train = sample(1:fm_size[1],ntrain) # Training indices
+ind_test = c(1:fm_size[1])[-ind_train] # Testing indices
+```
+
+Do PCA on training set and use the first 25 scores to represent the data. Project testing data onto the first 25 loadings. Use 1NN classification in the space of the first 25 scores to identify the subject for each testing observation.
+```{r}
+train <- face_matrix[ind_train,]
+subject_train <- subject[ind_train]
+test <- face_matrix[ind_test, ]
+subject_test <- subject[ind_test]
+#####Do PCA on training set and use the first 25 scores to represent data
+train_mat_mean <- colMeans(train)
+train_mat_center <- scale(train, center = TRUE, scale = F)
+mat_pca <- prcomp(train_mat_center)
+#Project testing data onto the first 25 loadings 
+#so that it is represented by the first 25 scores. Do not rescale the scores.
+train_loadings <- mat_pca$rotation[, 1:25]
+test_mean <- t(apply(test, 1, function(x) {x- train_mat_mean }))
+test_score <- test_mean%*%train_loadings
+#Use 1NN classification in the space of the first 25 scores to identify the subject for each testing observation
+train_score <- mat_pca$x[,1:25]
+test_hat <- knn(train_score, test_score, subject_train, 1)
+misidentified <- sum(test_hat != subject_test)
+misidentified
+```
+
+The misclassification rate is 0
+
+Using other pictures 
+```{r}
+# Use different lighting conditions
+#Builing a new matrix and using PCA and kNN for classification again
+pic_list = 1:38
+views_2 = c('P00A-035E+15', 'P00A-050E+00', 'P00A+035E+15', 'P00A+050E+00')
+
+dir_list_1 = dir(path="CroppedYale/",all.files=FALSE)
+dir_list_2 = dir(path="CroppedYale/",all.files=FALSE,recursive=TRUE)
+
+# Find the total number of pixels in a picture
+
+# Pre-allocate a matrix with dimensions (number of pictures) x (number of pixels per picture)
+face_matrix_2 <- vector()
+subject_2 <- vector()
+view_2 <- vector()
+# Load all of the pictures
+for (i in pic_list){
+    for (j in 1:4) {
+        filename = sprintf("CroppedYale/%s/%s_%s.pgm",
+                           dir_list_1[pic_list[i]] , dir_list_1[pic_list[i]] , views_2[j])
+        face = read.pnm(filename)
+        face_vector = getChannels(face)
+        face_vectors = as.vector(face_vector)
+        face_matrix_2 = rbind(face_matrix_2, face_vectors)
+        subject_2 <- c(subject_2, i)
+        view_2 <- c(view_2, j)
+    }
+}
+fm_2_size = dim(face_matrix_2)
+# Use 4/5 of the data for training, 1/5 for testing
+ntrain_2 = floor(fm_2_size[1]*4/5)
+ntest_2 = fm_2_size[1]-ntrain_2
+set.seed(2) # Set pseudo-random numbers
+ind_train_2 = sample(1:fm_2_size[1],ntrain_2)
+ind_test_2 = c(1:fm_2_size[1])[-ind_train_2]
+
+train_2 <- face_matrix_2[ind_train_2,]
+subject_2_train <- subject_2[ind_train_2]
+test_2 <- face_matrix_2[ind_test_2, ]
+subject_2_test <- subject_2[ind_test_2]
+#####Do PCA on training set and use the first 25 scores to represent data
+train_2_mean <- colMeans(train_2)
+train_2_center <- scale(train_2, center = TRUE, scale = F)
+mat_pca_2 <- prcomp(train_2_center)
+#Project testing data onto the first 25 loadings 
+#so that it is represented by the first 25 scores. Do not rescale the scores.
+train_loadings_2 <- mat_pca_2$rotation[, 1:25]
+test_mean_2 <- t(apply(test_2, 1, function(x) {x- train_2_mean }))
+test_score_2 <- test_mean_2%*%train_loadings_2
+#Use 1NN classification in the space of the first 25 scores to identify the subject for each testing observation
+train_score_2 <- mat_pca_2$x[,1:25]
+test_hat_2 <- knn(train_score_2, test_score_2, subject_2_train, 1)
+misidentified_2 <- sum(test_hat_2 != subject_2_test)
+misidentified_2
+```
+at this time, as many as 27 are misidentified
+Plot four subject photos that are misidentified next to the 1NN photo prediction
+```{r}
+par(mfrow=c(2,4))
+plot(pixmapGrey(matrix(test_2[test_hat_2 != subject_2_test, ][1, ], nrow = dim(face_vector)[1])), main="Y")
+plot(pixmapGrey(matrix(test_2[test_hat_2 != subject_2_test, ][2, ], nrow = dim(face_vector)[1])), main="Y")
+plot(pixmapGrey(matrix(test_2[test_hat_2 != subject_2_test, ][3, ], nrow = dim(face_vector)[1])), main="Y")
+plot(pixmapGrey(matrix(test_2[test_hat_2 != subject_2_test, ][4, ], nrow = dim(face_vector)[1])), main="Y")
+
+dist.train.test <- as.matrix(dist(face_matrix_2))[ind_test_2, ind_train_2][test_hat_2 != subject_2_test, ][1:4, ]
+train.row <- apply(dist.train.test, 1, which.min)
+plot(pixmapGrey(matrix(train_2[train.row[1], ], nrow = dim(face_vector)[1])), main="Y_hat")
+plot(pixmapGrey(matrix(train_2[train.row[2], ], nrow = dim(face_vector)[1])), main="Y_hat")
+plot(pixmapGrey(matrix(train_2[train.row[3], ], nrow = dim(face_vector)[1])), main="Y_hat")
+plot(pixmapGrey(matrix(train_2[train.row[4], ], nrow = dim(face_vector)[1])), main="Y_hat")
+```
+
+```{r}
+
+incorrextly <- vector()
+for (i in 3:12){
+    fm_2_size = dim(face_matrix_2)
+    # Use 4/5 of the data for training, 1/5 for testing
+    ntrain_2 = floor(fm_2_size[1]*4/5)
+    ntest_2 = fm_2_size[1]-ntrain_2
+    set.seed(i) # Set pseudo-random numbers
+    ind_train_2 = sample(1:fm_2_size[1],ntrain_2)
+    ind_test_2 = c(1:fm_2_size[1])[-ind_train_2]
+    
+    train_2 <- face_matrix_2[ind_train_2,]
+    subject_2_train <- subject_2[ind_train_2]
+    test_2 <- face_matrix_2[ind_test_2, ]
+    subject_2_test <- subject_2[ind_test_2]
+    #####Do PCA on training set and use the first 25 scores to represent data
+    train_2_mean <- colMeans(train_2)
+    train_2_center <- scale(train_2, center = TRUE, scale = F)
+    mat_pca_2 <- prcomp(train_2_center)
+    #Project testing data onto the first 25 loadings 
+    #so that it is represented by the first 25 scores. Do not rescale the scores.
+    train_loadings_2 <- mat_pca_2$rotation[, 1:25]
+    test_mean_2 <- t(apply(test_2, 1, function(x) {x- train_2_mean }))
+    test_score_2 <- test_mean_2%*%train_loadings_2
+    #Use 1NN classification in the space of the first 25 scores to identify the subject for each testing observation
+    train_score_2 <- mat_pca_2$x[,1:25]
+    test_hat_2 <- knn(train_score_2, test_score_2, subject_2_train, 1)
+    misidentified_2 <- sum(test_hat_2 != subject_2_test)
+    incorrextly <- c(incorrextly, misidentified_2)
+} 
+incorrextly
+```
+
+The misidentified rate is pretty high. This suggest that PCA lost many information of the data. 
+
